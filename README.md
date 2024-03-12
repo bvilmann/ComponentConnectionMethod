@@ -23,4 +23,5 @@ If you are using the code for research, you are required to cite the paper [2].
 
 # References
 [1] Energinet (2023), "Small-signal model requirement of DC-connected power park module", internal document, document number 23/04536-18, 
+
 [2] Vilmann, B (2024), "A Guide on How to Compose Small-signal Models with the Component Connection Method from Subsystems in State-space via Python and Excel", IEEE, in publishing
