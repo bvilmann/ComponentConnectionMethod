@@ -8,9 +8,11 @@ class StateSpaceVariableStore:
 
         # Add numpy functions or any other required functions to the namespace
         self.data.update({k: getattr(np, k) for k in dir(np) if not k.startswith('_')})
+        return
 
     def set(self, variable, value):
         self.data[variable] = value
+        return
 
     def get_binding(self):
         return self.data
@@ -29,12 +31,22 @@ class StateSpaceModelling:
             store.set(row['variable'], row['value'])
 
         # Create symbolic state space representation
-        # self.ss_sym = ss.replace('\.', '_', regex=True)
         self.ss_sym = ss
-
         return
 
     def evaluate_ssm_cell(self,cell):
+
+        # Handling 0 and np.nan
+        if isinstance(cell, float):
+            if np.isnan(cell):
+                return 0
+            elif cell == 0.0:
+                return 0
+        elif isinstance(cell, int):
+            if cell == 0:
+                return 0
+
+        # Evaluate cell
         try:
             return eval(cell, self.store.get_binding()) if cell else None
         except Exception as e:
@@ -44,8 +56,6 @@ class StateSpaceModelling:
                 except Exception as e_:
                     print(f'"{cell}" was not recognized as a number, i.e. evaluated as 0!')
                     return 0
-            elif (isinstance(cell, float) or isinstance(cell, int)) and np.isnan(cell):
-                return 0
 
             raise ValueError(f'"{cell}" ({type(cell)}) was not recognized as a variable, i.e. evaluated as 0!\nCheck if you miss to initialize and load the variables into the CCM call.')
             return 0
@@ -65,14 +75,4 @@ class StateSpaceModelling:
             return self.ss_num
         else:
             return self.ss_eval
-
-# =================== SCRIPT ===================
-# file = r'statespacemodels\ssm_test.xlsx'
-
-# ssm = StateSpaceModelling(file)
-
-# print(ssm.form_ss())
-
-
-# =================== SCRIPT ===================
 
