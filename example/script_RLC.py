@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Mar 10 09:49:26 2024
-
-@author: bvilm
+@author: bevil @ Technical University of Denmark (DTU)
 """
-# ======================== PACKAGES ======================== 
+# ======================== PACKAGES ========================
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import solve_ivp
@@ -24,13 +23,18 @@ L = 0.01  # Inductance in henries
 C = 0.001  # Capacitance in farads
 Kp = 1
 Ki = 30
+
+# Dynamically define the parameters of interest
 params = {'R':R, 'L':L,'C':C,'Ki':Ki,'Kp':Kp}
 
 # Load each subsystem and apply CCM
 CCSM = [StateSpaceSystem(file_path, i, vals=params, comp_id=1) for i in (0,1)]
 ccm = ComponentConnectionMethod(CCSM)
 
-# ======================== SIMULATION - CONTROL ======================== 
+print(ccm)
+ccm.show(fontsize = 24,save=True,boldfacecolor='magenta',text_alpha = 0.75)
+
+# ======================== SIMULATION - CONTROL ========================
 # Time span for the simulation
 t_span = (0, 0.5)  # 5 seconds
 t_eval = np.linspace(*t_span, 5000)  # Time points where the solution is evaluated
@@ -84,6 +88,9 @@ for i in range(2):
     ax[i].legend()
     ax[i].axhline(0, lw=0.75,color='k',ls='-')
 fig.align_ylabels()
+
+fig.tight_layout()
+
 # plt.show()
 
 plt.savefig('RLC_simulation.pdf',bbox_inches=0)
