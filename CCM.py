@@ -20,19 +20,17 @@ import matplotlib.cm as cm
 
 #%%
 class StateSpaceSystem:
-    def __init__(self,file_path,ss,vals:dict={},verbose=False,comp_id=1,key='CCM'):
+    def __init__(self,file_path:str,ss,vals:dict={},verbose=False,comp_id=1):
         self.ssm = ssm = SSM(file_path,f'var',f'SS{ss}')
         self.L = df = pd.read_excel(file_path, sheet_name=f'L_map')
 
-        self.name = f'{key}{comp_id}'
+        self.name = f'{comp_id}'
 
         self.u = u = df[(df.group == 'comp') & (df.vector == 'input') & (df.comp == ss)].sort_values(['comp','idx'], inplace=False)
         self.y = y = df[(df.group == 'comp') & (df.vector == 'output') & (df.comp == ss)].sort_values(['comp','idx'], inplace=False)
         self.x = x = df[(df.group == 'comp') & (df.vector == 'state') & (df.comp == ss)].sort_values(['comp','idx'], inplace=False)
         self.a = a = df[(df.group == 'sys') & (df.vector == 'input') & (df.comp == ss)].sort_values(['comp','idx'], inplace=False)
         self.b = b = df[(df.group == 'sys') & (df.vector == 'output') & (df.comp == ss)].sort_values(['comp','idx'], inplace=False)
-        
-        # 
 
         # Change values based on input
         for k, v in vals.items():
@@ -64,26 +62,34 @@ class StateSpaceSystem:
 
 
 class ComponentConnectionMethod:
-    def __init__(self,subsystems,system_input:list=None, system_output:list=None):
-        self.name = self.suffix = subsystems[0].name
+    def __init__(self,file_path,params:dict={},comp_id:str='CCM',system_input:list=None, system_output:list=None):
+        # -------- Store data --------
+        # Count sheets starting with "SS"
+        ss_sheets_count = len([1 for sheet in pd.ExcelFile(file_path).sheet_names if sheet.startswith('SS')])
+
+        # Read file
+        subsystems = [StateSpaceSystem(file_path, i, vals=params, comp_id=comp_id) for i in range(0,ss_sheets_count)]
+
+        print(subsystems)
+
+        # -------- Store data --------
+        self.name = self.suffix = comp_id
         self.subsystems = subsystems
         I = lambda x: np.diag(np.ones(x))
         self.L = L_map = subsystems[0].L
         self.L_map = subsystems[0].L
         self.a = subsystems[0].a
         self.b = subsystems[0].b
-        self.system_input = system_input
-        self.system_output = system_output
+        if system_input is None:
+            self.system_input = list(L_map[(L_map['group'] == 'sys') & (L_map['vector'] == 'input')].name.values)
+        else:
+            self.system_input = system_input
+        if system_output is None:
+            self.system_output = list(L_map[(L_map['group'] == 'sys') & (L_map['vector'] == 'output')].name.values)
+        else:
+            self.system_output = system_output
 
-        
-        if system_input is not None and system_output is not None:
-            # print(L_map)
-            # L_map = L_map[(L_map['name'] == system_input & L_map['group']=='sys' & L_map['vector']=='input') \
-            L_map = L_map[((L_map['name'].isin(system_input)) & (L_map['group']=='sys') & (L_map['vector']=='input')) \
-                          |((L_map['name'].isin(system_output)) & (L_map['group']=='sys') & (L_map['vector']=='output')) \
-                          |(L_map['group']=='comp')]
-            # print(L_map)
-                
+        # -------- Composite system state model (CSSM) --------
         # Prepare dictionary for subsystem matrices
         for M in ['A','B','C','D']:
             setattr(self,M,{})
@@ -105,77 +111,92 @@ class ComponentConnectionMethod:
             # print(M,'\n',getattr(self,M))
             getattr(self,M)[0] = block_diag(*matrices)
         
+        # -------- L-map --------
+        if system_input is not None and system_output is not None:
+            L_map = L_map[((L_map['name'].isin(system_input)) & (L_map['group']=='sys') & (L_map['vector']=='input')) \
+                          |((L_map['name'].isin(system_output)) & (L_map['group']=='sys') & (L_map['vector']=='output')) \
+                          |(L_map['group']=='comp')]
         # Get L-map
         self.L = L = self.get_interconnection_matrices(L_map)
         for k,v in L.items():
             setattr(self,f'L{k}',v)
         
-        # Create system matrix
-        A = self.A
-        B = self.B
-        C = self.C
-        D = self.D
-        
+        # -------- Composite system state model (CSSM) --------
+        # Ease notation
+        A = self.A; B = self.B; C = self.C; D = self.D
         nx = len(A[0])
         ny = len(D[0] @ L[1])
-        
-        
-        # print(A[0].shape,B[0].shape,D[0].shape,L[1].shape,C[0].shape,(D[0] @ L[1]).shape)
-        F =  A[0] + B[0] @ L[1] @ inv(I(ny)-D[0] @ L[1]) @ C[0]
-        G =  B[0] @ L[1] @ inv(I(ny)-D[0] @ L[1]) @ D[0] @ L[2]+B[0] @ L[2]
-        H =  L[3] @ inv(I(ny)-D[0] @ L[1]) @ C[0]
-        J =  L[3] @ inv(I(ny)-D[0] @ L[1]) @ D[0] @ L[2]+L[4]
-        
-        self.sys = {'A':F,
-                    'B':G,
-                    'C':H,
-                    'D':J}
 
-        # Shift variable names cmp => "_M" and sys => "M"
-        for M in ['F','G','H','J']:
-            # setattr(self,f'_{M}',getattr(self, M))
-            setattr(self,M,eval(f'{M}'))
-    
+        # Calcualte the composite system state model (CSSM)
+        self.F =  F =  A[0] + B[0] @ L[1] @ inv(I(ny)-D[0] @ L[1]) @ C[0]
+        self.G =  G =  B[0] @ L[1] @ inv(I(ny)-D[0] @ L[1]) @ D[0] @ L[2]+B[0] @ L[2]
+        self.H = H = L[3] @ inv(I(ny)-D[0] @ L[1]) @ C[0]
+        self.J = J = L[3] @ inv(I(ny)-D[0] @ L[1]) @ D[0] @ L[2]+L[4]
+
+        # Store data in dictionary
+        self.sys = {'F':F,
+                    'G':G,
+                    'H':H,
+                    'J':J}
+
         return
 
-    # def __repr__(self):
-    #     # print('\nA:',pd.DataFrame(self.A,index=self.x.name,columns=self.x.name),
-    #     #       '\nB:',pd.DataFrame(self.B,index=self.x.name,columns=self.u.name),
-    #     #       '\nC:',pd.DataFrame(self.C,index=self.y.name,columns=self.x.name),
-    #     #       '\nD:',pd.DataFrame(self.D,index=self.y.name,columns=self.u.name),
-    #     #       sep='\n')
-    #     # print('\nA:',pd.DataFrame(self.A),'\nB:',pd.DataFrame(self.B),'\nC:',pd.DataFrame(self.C),'\nD:',pd.DataFrame(self.D),sep='\n')
-    #     return
+    def __repr__(self):
+        data = {
+            'F': pd.DataFrame(self.F,index=self.x.name.values,columns=self.x.name.values),
+            'G': pd.DataFrame(self.G,index=self.x.name.values,columns=self.a.name.values),
+            'H': pd.DataFrame(self.H,index=self.b.name.values,columns=self.x.name.values),
+            'J': pd.DataFrame(self.J,index=self.b.name.values,columns=self.a.name.values)
+        }
+        print_str = ''
+        for k, v in data.items():
+            print_str += f'# ============== [{k}] ============== #\n{v}\n\n'
+        return print_str
 
-
-    def show(self,save:bool=False):
-        # ====================== SUBSYSTEMS ======================
+    def show(self,save:bool = False,fontsize = 20,ccsm_tick_fontsize= 16,cssm_tick_fontsize=16,boldfacecolor='grey',text_alpha = 0.25):
+        # ====================== CCSM ======================
         fig, ax = plt.subplots(1,1,dpi=150)
-        M = np.vstack([np.hstack([self._A[0],self._B[0]]),
-                      np.hstack([self._C[0],self._D[0]])])
+        M = np.vstack([np.hstack([self.A[0],self.B[0]]),
+                      np.hstack([self.C[0],self.D[0]])])
 
-        ax.imshow(np.where(M==0,np.nan,M))
+        ax.imshow(np.where(M==0,np.nan,0.75), cmap='gray', vmin=0, vmax=2)
 
         xlabels = ['$' + n + '$' for n in self.x.latex_name] + ['$' + n + '$' for n in self.u.latex_name]
         ylabels = ['$' + n + '$' for n in self.x.latex_name] + ['$' + n + '$' for n in self.y.latex_name]
 
         ax.set_xticks([i for i in range(len(xlabels))])
         ax.set_yticks([i for i in range(len(ylabels))])
-        ax.set_xticklabels(xlabels,fontsize=6)
-        ax.set_yticklabels(ylabels,fontsize=6)
+        ax.set_xticklabels(xlabels,fontsize=ccsm_tick_fontsize)
+        ax.set_yticklabels(ylabels,fontsize=ccsm_tick_fontsize)
 
         # Minor ticks
         ax.set_xticks(np.arange(-.5, len(xlabels), 1), minor=True)
         ax.set_yticks(np.arange(-.5, len(ylabels), 1), minor=True)
 
-        ax.axvline(self.x.shape[0]-.5,color='k',lw=0.75)
-        ax.axhline(self.x.shape[0]-.5,color='k',lw=0.75)
+        ax.axvline(self.x.shape[0]-.5,color='magenta',zorder=6)
+        ax.axhline(self.x.shape[0]-.5,color='magenta',zorder=6)
 
-        text_alpha = 0.25
-        ax.text(self.x.shape[0]/2-.5,self.x.shape[0]/2-.5, "A",ha='center',va='center', fontweight="bold",color='grey',fontsize=20,alpha=text_alpha,zorder=1)
-        ax.text(self.x.shape[0]+self.u.shape[0]/2-.5,self.x.shape[0]/2-.5, "B",ha='center',va='center', fontweight="bold",color='grey',fontsize=20,alpha=text_alpha,zorder=1)
-        ax.text(self.x.shape[0]/2-.5,self.x.shape[0]+self.y.shape[0]/2-.5, "C",ha='center',va='center', fontweight="bold",color='grey',fontsize=20,alpha=text_alpha,zorder=1)
-        ax.text(self.x.shape[0]+self.u.shape[0]/2-.5,self.x.shape[0]+self.y.shape[0]/2-.5, "D",ha='center',va='center', fontweight="bold",color='grey',fontsize=20,alpha=text_alpha,zorder=1)
+
+        x_, y_, u_ = 0,0,0
+        for ss in self.subsystems[:-1]:
+            x_ += len(ss.x)
+            u_ += len(ss.u)
+            y_ += len(ss.y)
+
+            # x lines
+            ax.axhline(x_ - .5, color='cyan',ls = '--')
+            ax.axvline(x_ - .5, color='cyan',ls = '--')
+
+            # u line
+            ax.axvline(self.x.shape[0] + u_ - .5, color='cyan',ls = '--')
+
+            # y line
+            ax.axhline(self.x.shape[0] + y_ - .5, color='cyan',ls = '--')
+
+        ax.text(self.x.shape[0]/2-.5,self.x.shape[0]/2-.5, "A",ha='center',va='center', fontweight="bold",color=boldfacecolor,fontsize=fontsize,alpha=text_alpha,zorder=1)
+        ax.text(self.x.shape[0]+self.u.shape[0]/2-.5,self.x.shape[0]/2-.5, "B",ha='center',va='center', fontweight="bold",color=boldfacecolor,fontsize=fontsize,alpha=text_alpha,zorder=1)
+        ax.text(self.x.shape[0]/2-.5,self.x.shape[0]+self.y.shape[0]/2-.5, "C",ha='center',va='center', fontweight="bold",color=boldfacecolor,fontsize=fontsize,alpha=text_alpha,zorder=1)
+        ax.text(self.x.shape[0]+self.u.shape[0]/2-.5,self.x.shape[0]+self.y.shape[0]/2-.5, "D",ha='center',va='center', fontweight="bold",color=boldfacecolor,fontsize=fontsize,alpha=text_alpha,zorder=1)
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
 
@@ -186,15 +207,15 @@ class ComponentConnectionMethod:
         if not save:
             plt.show()
         else:
-            plt.savefig(r'C:\Users\bvilm\Dropbox\Apps\Overleaf\Thesis - Stability Analysis of MMC-HVDC Connections with Parallel Grid-Forming Mode in Offshore Energy Hubs\sources\06_state_space\img\ccm_comp.pdf',bbox_inches='tight')
+            plt.savefig('CCSM_matrix.pdf',bbox_inches='tight')
         plt.close()
 
-        # ====================== CCM SYSTEM ======================
+        # ====================== CSSM SYSTEM ======================
         fig, ax = plt.subplots(1,1,dpi=150)
-        M = np.vstack([np.hstack([self.A,self.B]),
-                      np.hstack([self.C,self.D])])
+        M = np.vstack([np.hstack([self.F,self.G]),
+                      np.hstack([self.H,self.J])])
 
-        ax.imshow(np.where(M==0,np.nan,M))
+        ax.imshow(np.where(M==0,np.nan,0.75), cmap='gray', vmin=0, vmax=2)
 
         u = ['$' + n[1].latex_name + '$' for n in self.L_map.iterrows() if n[1].group =='sys' and n[1]['name'] in self.system_input]
         y = ['$' + n[1].latex_name + '$' for n in self.L_map.iterrows() if n[1].group =='sys' and n[1]['name'] in self.system_output]
@@ -203,21 +224,20 @@ class ComponentConnectionMethod:
 
         ax.set_xticks([i for i in range(len(xlabels))])
         ax.set_yticks([i for i in range(len(ylabels))])
-        ax.set_xticklabels(xlabels,fontsize=8)
-        ax.set_yticklabels(ylabels,fontsize=8)
+        ax.set_xticklabels(xlabels,fontsize=cssm_tick_fontsize)
+        ax.set_yticklabels(ylabels,fontsize=cssm_tick_fontsize)
 
         # Minor ticks
         ax.set_xticks(np.arange(-.5, len(xlabels), 1), minor=True)
         ax.set_yticks(np.arange(-.5, len(ylabels), 1), minor=True)
 
-        ax.axvline(self.x.shape[0]-.5,color='k',lw=0.75)
-        ax.axhline(self.x.shape[0]-.5,color='k',lw=0.75)
+        ax.axvline(self.x.shape[0]-.5,color='magenta')
+        ax.axhline(self.x.shape[0]-.5,color='magenta')
 
-        text_alpha = 0.25
-        ax.text(self.x.shape[0]/2-.5,self.x.shape[0]/2-.5, "A",ha='center',va='center', fontweight="bold",color='grey',fontsize=20,alpha=text_alpha,zorder=1)
-        ax.text(self.x.shape[0]+len(u)/2-.5,self.x.shape[0]/2-.5, "B",ha='center',va='center', fontweight="bold",color='grey',fontsize=20,alpha=text_alpha,zorder=1)
-        ax.text(self.x.shape[0]/2-.5,self.x.shape[0]+len(y)/2-.5, "C",ha='center',va='center', fontweight="bold",color='grey',fontsize=20,alpha=text_alpha,zorder=1)
-        ax.text(self.x.shape[0]+len(u)/2-.5,self.x.shape[0]+len(y)/2-.5, "D",ha='center',va='center', fontweight="bold",color='grey',fontsize=20,alpha=text_alpha,zorder=1)
+        ax.text(self.x.shape[0]/2-.5,self.x.shape[0]/2-.5, "F",ha='center',va='center', fontweight="bold",color=boldfacecolor,fontsize=fontsize,alpha=text_alpha,zorder=1)
+        ax.text(self.x.shape[0]+len(u)/2-.5,self.x.shape[0]/2-.5, "G",ha='center',va='center', fontweight="bold",color=boldfacecolor,fontsize=fontsize,alpha=text_alpha,zorder=1)
+        ax.text(self.x.shape[0]/2-.5,self.x.shape[0]+len(y)/2-.5, "H",ha='center',va='center', fontweight="bold",color=boldfacecolor,fontsize=fontsize,alpha=text_alpha,zorder=1)
+        ax.text(self.x.shape[0]+len(u)/2-.5,self.x.shape[0]+len(y)/2-.5, "J",ha='center',va='center', fontweight="bold",color=boldfacecolor,fontsize=fontsize,alpha=text_alpha,zorder=1)
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
 
@@ -229,9 +249,8 @@ class ComponentConnectionMethod:
         if not save:
             plt.show()
         else:
-            plt.savefig(r'C:\Users\bvilm\Dropbox\Apps\Overleaf\Thesis - Stability Analysis of MMC-HVDC Connections with Parallel Grid-Forming Mode in Offshore Energy Hubs\sources\06_state_space\img\ccm_sys.pdf',bbox_inches='tight')
+            plt.savefig('CSSM_matrix.pdf',bbox_inches='tight')
         plt.close()
-
 
         return
 
@@ -257,7 +276,6 @@ class ComponentConnectionMethod:
         G.add_nodes_from([ f"{n['group'][0]}{n['vector'][0]}_{n['name']}" for i, n in u_s.iterrows()])
         G.add_nodes_from([ f"{n['group'][0]}{n['vector'][0]}_{n['name']}" for i, n in y_s.iterrows()])
 
-        # print(u_c,y_c,u_s,y_s)
         L = {}
         edges = []
         edge_clrs = []
@@ -277,7 +295,6 @@ class ComponentConnectionMethod:
                         L[int(f'{i+1}')][j,k] = 1
 
         return L
-    
 
     def dynamic_simulation(self,x0,t0,t1,dt = 0.001):
         t = np.arange(t0,t1,dt)
@@ -336,9 +353,7 @@ class ComponentConnectionMethod:
         ax.set_yticks([i for i in range(len(self.x))])
         ax.set_xticklabels(['$\\lambda_{' + str(i) +'}$' for i in range(1,len(self.x)+1)])
         ax.set_yticklabels(['$'+str(x)+'$' for x in self.x['latex_name']])
-        # fig.colorbar(im, ax=ax, location='right', anchor=(0.2, 0.2))
 
-        # c = plt.colorbar(im, cax = fig.add_axes([0.78, 0.5, 0.03, 0.38]))
 
         from mpl_toolkits.axes_grid1 import make_axes_locatable
     
@@ -352,21 +367,15 @@ class ComponentConnectionMethod:
         plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm), cax=ax_cb,extend = 'max')
 
         ax_cb.yaxis.tick_right()
-        # ax_cb.yaxis.set_tick_params(labelright=False)
 
         # Minor ticks
         ax.set_xticks(np.arange(-.5, P.shape[0], 1), minor=True)
         ax.set_yticks(np.arange(-.5, P.shape[0], 1), minor=True)
 
-        # if P.shape[0] > 24:
-        #     ax.set_xticklabels([("$\\lambda_{"+str(i+1)+"}$","")[i%2 == 1] for i in range(len(P))])
-        
         # Gridlines based on minor ticks
         ax.grid(which='minor', color='lightgrey', linestyle=':', linewidth=0.5)
 
         fig.tight_layout()
-
-        # plt.savefig(f'C:\\Users\\bvilm\\Dropbox\\Apps\\Overleaf\\46710 - Stability and control - A3\\img\\{self.filename}_P.pdf')
 
         plt.show()
         plt.close()
@@ -374,13 +383,3 @@ class ComponentConnectionMethod:
         return
 
 
-
-
-    
-#%%
-
-# path = r'C:\Users\bvilm\Dropbox\Apps\Overleaf\Thesis - Stability Analysis of MMC-HVDC Connections with Parallel Grid-Forming Mode in Offshore Energy Hubs\sources\07_stability\img'
-# plot_Zdq(tf_dq_Rv,save=f'{path}\\impedance_plot_hsc_Rv.pdf')
-# plot_Zdq(tf_dq_Lv,save=f'{path}\\impedance_plot_hsc_Lv.pdf')
-
-#%%
