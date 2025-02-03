@@ -5,7 +5,7 @@ The motivation of the implementation is to extend options of handling interconne
 
 # Usage
 ## Research and development purposes
-If you are using the code for research, you must cite the paper [2].
+If you are using the code for research, please cite the paper [2].
 
 ### BIBTEX
 
