@@ -3,13 +3,20 @@ The Component Connection Method (CCM) composes a single small-signal model from 
 
 The motivation of the implementation is to extend options for handling interconnected dynamical systems in Python-based analysis frameworks. Using Excel was a practical need for a tabular editing view. This dependency can easily be changed within the code.
 
-# Future work
+### Getting started
+- [ ] Download the repository
+- [ ] Open your favorite Python IDE
+- [ ] Open an example file 
+- [ ] Make sure that `CCM.py` is callable from the script
+- [ ] Run the script
+
+## Future work
 We are currently working on incorporating the CCM functionality for nonlinear dynamical models together with a load flow solver for better small-signal sensitivity analysis features in Python-based investigations.
 
-# License
+## License
 The repository is distributed under the MIT License.
 
-# Research and development purposes
+## Research and development purposes
 If you are using the code for research, please cite the paper, [Composing Small-Signal Models via the Component Connection Method with Python and Excel](https://ieeexplore-ieee-org.proxy.findit.cvt.dk/document/10892445):
 
 |Citation||
