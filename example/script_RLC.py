@@ -69,13 +69,12 @@ fig.tight_layout()
 plt.show()
 
 
-
 #%% ======================== EIGENVALUE SENSITIVY ANALYSIS ======================== 
 fig, ax1 = plt.subplots(1,1,dpi=150)
 
 file_path = f'{os.path.dirname(os.path.abspath(__file__))}\\CCM_RLC.xlsx'
 
-for i, Ki in enumerate([0,10,30,50]):
+for i, Ki in enumerate([0,50,150,250]):
     
     # Dynamically define the parameters of interest
     params = {'R':R, 'L':L,'C':C,'Ki':Ki,'Kp':Kp}
@@ -87,11 +86,13 @@ for i, Ki in enumerate([0,10,30,50]):
     ccm.show(fontsize = 24,save=True,boldfacecolor='magenta',text_alpha = 0.75)
         
     eigs = np.linalg.eigvals(ccm.F)
-    ax1.scatter(eigs.real,eigs.imag,color='C0',label=Ki,alpha=1/(i+1))
+    ax1.scatter(eigs.real,eigs.imag,color='C0',label=Ki,alpha=1/(i+1),zorder=10)
+
+ax1.fill_betweenx((-600,600),0, 30,color='red',alpha=.25)
+ax1.set(ylim=(-600,600),xlim=(-120,20))
 
 ax1.legend(title='$K_i$')
 ax1.grid(ls=':')
 plt.show()
-
 
     
