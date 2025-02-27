@@ -17,7 +17,7 @@ We are currently working on incorporating the CCM functionality for nonlinear dy
 The repository is distributed under the MIT License.
 
 ## Research and development purposes
-If you are using the code for research, please cite the paper, [Composing Small-Signal Models via the Component Connection Method with Python and Excel](https://ieeexplore-ieee-org.proxy.findit.cvt.dk/document/10892445):
+If you are using the code for research, please cite the paper, [Composing Small-Signal Models via the Component Connection Method with Python and Excel](https://ieeexplore.ieee.org/document/10892445):
 
 |Citation||
 |----|----|
