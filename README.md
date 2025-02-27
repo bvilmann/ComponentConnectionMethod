@@ -12,8 +12,8 @@ Remember that the `CCM.py` must be callable in custom setups and you need to con
 
 ### The CCM mapping
 The CCM maps inputs and outputs of the decoupled dynamical subsystems (CCSM) to the coupled dynamical system enclosed by system input and outputs (CSSM).
-  ![CCM](https://raw.githubusercontent.com/bvilmann/ComponentConnectionMethod/refs/heads/main/docs/ccm.png "CCM"){width="200px"}
 
+<img src="https://raw.githubusercontent.com/bvilmann/ComponentConnectionMethod/refs/heads/main/docs/ccm.png" width="500">
 ### Validation
 
 The method has been validated by comparing smaller coupled dynamic systems against MATLAB results.
