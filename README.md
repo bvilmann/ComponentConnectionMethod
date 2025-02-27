@@ -10,6 +10,15 @@ The motivation of the implementation is to extend options for handling interconn
 
 Remember that the `CCM.py` must be callable in custom setups and you need to configure the Excel file accordingly (see details in the [paper](https://ieeexplore.ieee.org/document/10892445)).
 
+### The CCM mapping
+The CCM maps inputs and outputs of the decoupled dynamical subsystems (CCSM) to the coupled dynamical system enclosed by system input and outputs (CSSM).
+  ![CCM](https://raw.githubusercontent.com/bvilmann/ComponentConnectionMethod/refs/heads/main/docs/ccm.png "CCM"){width="200px"}
+
+### Validation
+
+The method has been validated by comparing smaller coupled dynamic systems against MATLAB results.
+![Validation](https://raw.githubusercontent.com/bvilmann/ComponentConnectionMethod/refs/heads/main/docs/system.png "system_validation")
+
 ## Future work
 We are currently working on incorporating the CCM functionality for nonlinear dynamical models together with a load flow solver for better small-signal sensitivity analysis features in Python-based investigations.
 
