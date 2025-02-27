@@ -8,7 +8,7 @@ The motivation of the implementation is to extend options for handling interconn
 - [ ] Open the example file `script_RLC.py` in the `example` folder
 - [ ] Run the script using your favorite Python IDE
 
-Remember that the `CCM.py` and `StateSpaceModelling.py` must be callable in custom setups.
+Remember that the `CCM.py` must be callable in custom setups.
 
 ## Future work
 We are currently working on incorporating the CCM functionality for nonlinear dynamical models together with a load flow solver for better small-signal sensitivity analysis features in Python-based investigations.
