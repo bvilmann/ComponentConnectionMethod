@@ -2,8 +2,9 @@
 """
 Created on Fri Nov 10 08:50:37 2023
 
-@author: bvilm
+@author: Benjamin Vilmann
 """
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -11,17 +12,86 @@ import matplotlib.pyplot as plt
 import matplotlib
 from scipy.linalg import block_diag
 from numpy.linalg import inv,eig
-from StateSpaceModelling import StateSpaceModelling as SSM
 from numpy import sin, cos
 
 import control
 import matplotlib.cm as cm
 
+import pandas as pd
+import numpy as np
+from numpy import sin, cos
+
+class StateSpaceVariableStore:
+    def __init__(self):
+        self.data = {}
+
+        # Add numpy functions or any other required functions to the namespace
+        self.data.update({k: getattr(np, k) for k in dir(np) if not k.startswith('_')})
+
+    def set(self, variable, value):
+        self.data[variable] = value
+
+    def get_binding(self):
+        return self.data
+
+class StateSpaceModelling:
+    def __init__(self,filepath,var_sheet,ss_sheet):
+
+        # Load data
+        vars = pd.read_excel(filepath,sheet_name=var_sheet,header=0)
+        ss = pd.read_excel(filepath,sheet_name=ss_sheet,header=0,index_col=0)
+
+        # Store variables
+        self.store = store = StateSpaceVariableStore()
+        for i, row in vars.iterrows():
+            # store.set(row['group'], row['variable'], row['value'])
+            store.set(row['variable'], row['value'])
+
+        # Create symbolic state space representation
+        # self.ss_sym = ss.replace('\.', '_', regex=True)
+        self.ss_sym = ss
+
+        return
+
+    def evaluate_ssm_cell(self,cell):
+        try:
+            return eval(cell, self.store.get_binding()) if cell else None
+        except Exception as e:
+            if (isinstance(cell, float) or isinstance(cell, int)) and not np.isnan(cell):
+                try:
+                    return float(cell)
+                except Exception as e_:
+                    print(f'"{cell}" was not recognized as a number, i.e. evaluated as 0!')
+                    return 0
+            elif (isinstance(cell, float) or isinstance(cell, int)) and np.isnan(cell):
+                return 0
+
+            raise ValueError(f'"{cell}" ({type(cell)}) was not recognized as a variable, i.e. evaluated as 0!\nCheck if you miss to initialize and load the variables into the CCM call.')
+            return 0
+
+    def eval_num_ss(self,format = 'numpy'):
+        # input validation
+        assert format in ['numpy','dataframe','df','pandas'], "Expected 'format' to be in ['numpy','dataframe','df','pandas']"
+
+        # Evaluate each cell of state space model
+        self.ss_eval = self.ss_sym.applymap(self.evaluate_ssm_cell)
+
+        # Convert to numpy
+        self.ss_num = self.ss_eval.to_numpy()
+
+        # Return depending on requested format
+        if format == 'numpy':
+            return self.ss_num
+        else:
+            return self.ss_eval
+
+
+
 
 #%%
 class StateSpaceSystem:
     def __init__(self,file_path:str,ss,vals:dict={},verbose=False,comp_id=1):
-        self.ssm = ssm = SSM(file_path,f'var',f'SS{ss}')
+        self.ssm = ssm = StateSpaceModelling(file_path,f'var',f'SS{ss}')
         self.L = df = pd.read_excel(file_path, sheet_name=f'L_map')
 
         self.name = f'{comp_id}'
@@ -295,91 +365,3 @@ class ComponentConnectionMethod:
                         L[int(f'{i+1}')][j,k] = 1
 
         return L
-
-    def dynamic_simulation(self,x0,t0,t1,dt = 0.001):
-        t = np.arange(t0,t1,dt)
-
-        dx = np.zeros((len(self.lamb),len(t)), dtype=np.complex)
-        
-        for k in range(0,len(t)):
-            dx[:,k] = self.Phi.dot(np.exp(self.lamb*t[k])*(self.Psi).dot(x0))
-
-        data = {f'${self.ltx_names[i,0][0]}$': list(dx[i,:]) for i in range(len(self.lamb))}
-        df = pd.DataFrame(data,index=list(t))        
-
-        return df
-
-
-    def plot_time_response(self, fig, ax, x0, t0=0, t1=5, xlabel=False):        
-
-        fig, ax = plt.subplots(1,1)
-
-   
-        ax.plot(self.t_plot_tr, self.dx_plot_tr[0], label=self.filename)
-        
-        ax.grid(linestyle='-.', linewidth=.25)
-        ax.grid(linestyle=':', which='minor', linewidth=.25, alpha=.5)
-        if xlabel:
-            ax.set_xlabel('time [s]')
-        ax.set_ylabel(self.filename)
-
-        fig.tight_layout()        
-
-        plt.savefig(f'C:\\Users\\bvilm\\Dropbox\\Apps\\Overleaf\\46710 - Stability and control - A3\\img\\{self.filename}_series.pdf')
-        
-        return fig, ax
-
-
-    
-    def solve(self):
-        
-        return
-
-    
-    def participation_factor(self,vmax=1.):
-        lamb, R = eig(self.A)
-        L = inv(R)
-        P = self.P
-                
-        if P.shape[0] > 24:
-            fig,ax = plt.subplots(1,1,figsize=(9,9),dpi=200)
-        elif P.shape[0] == 24:
-            fig,ax = plt.subplots(1,1,figsize=(8,8),dpi=200)
-        else:
-            fig,ax = plt.subplots(1,1,figsize=(6,6),dpi=200)
-        im = ax.imshow(np.where((abs(P)>0.02) & (abs(P)<=vmax),abs(P),np.nan),vmin=0, vmax=vmax)
-        ax.imshow(np.where(abs(P)>vmax,1,np.nan),vmin=0, vmax=vmax,cmap='Reds',alpha=0.25)
-        ax.set_xticks([i for i in range(len(self.x))])
-        ax.set_yticks([i for i in range(len(self.x))])
-        ax.set_xticklabels(['$\\lambda_{' + str(i) +'}$' for i in range(1,len(self.x)+1)])
-        ax.set_yticklabels(['$'+str(x)+'$' for x in self.x['latex_name']])
-
-
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-    
-        divider = make_axes_locatable(ax)
-    
-        ax_cb = divider.append_axes("right", size="5%", pad=0.1)
-        fig = ax.get_figure()
-        fig.add_axes(ax_cb)
-        
-        norm = matplotlib.colors.Normalize(vmin=0, vmax=vmax)
-        plt.colorbar(matplotlib.cm.ScalarMappable(norm=norm), cax=ax_cb,extend = 'max')
-
-        ax_cb.yaxis.tick_right()
-
-        # Minor ticks
-        ax.set_xticks(np.arange(-.5, P.shape[0], 1), minor=True)
-        ax.set_yticks(np.arange(-.5, P.shape[0], 1), minor=True)
-
-        # Gridlines based on minor ticks
-        ax.grid(which='minor', color='lightgrey', linestyle=':', linewidth=0.5)
-
-        fig.tight_layout()
-
-        plt.show()
-        plt.close()
-
-        return
-
-
