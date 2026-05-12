@@ -33,3 +33,7 @@ If you are using the code for research, please cite the paper, [Composing Small-
 |----|----|
 |Text|B. Vilmann, O. Saborío-Romano and D. Müller, "Composing Small-Signal Models via the Component Connection Method with Python and Excel," 2024 59th International Universities Power Engineering Conference (UPEC), Cardiff, United Kingdom, 2024, pp. 1-6, doi: 10.1109/UPEC61344.2024.10892445. keywords: {Power engineering;Codes;Frequency-domain analysis;Electricity;Power system stability;Stability analysis;Generators;Power generation;component connection method;state-space;small-signal model;applied engineering;open-source;grid code requirements},|
 |BIBTEX|@INPROCEEDINGS{10892445, author={Vilmann, Benjamin and Saborío-Romano, Oscar and Müller, Daniel},   booktitle={2024 59th International Universities Power Engineering Conference (UPEC)},    title={Composing Small-Signal Models via the Component Connection Method with Python and Excel},    year={2024},   volume={},   number={},    pages={1-6},   keywords={Power engineering;Codes;Frequency-domain analysis;Electricity;Power system stability;Stability analysis;Generators;Power generation;component connection method;state-space;small-signal model;applied engineering;open-source;grid code requirements}, doi={10.1109/UPEC61344.2024.10892445}}|
+
+## Notes and updates
+- Typo: In (11) in the paper, please find `F(3,1)=3000`, `F(3,2)=-200`, and `G(3,1)=100`.
+
