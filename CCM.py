@@ -69,24 +69,29 @@ class StateSpaceModelling:
             raise ValueError(f'"{cell}" ({type(cell)}) was not recognized as a variable, i.e. evaluated as 0!\nCheck if you miss to initialize and load the variables into the CCM call.')
             return 0
 
-    def eval_num_ss(self,format = 'numpy'):
+    def eval_num_ss(self, format='numpy'):
         # input validation
-        assert format in ['numpy','dataframe','df','pandas'], "Expected 'format' to be in ['numpy','dataframe','df','pandas']"
-
+        assert format in ['numpy', 'dataframe', 'df', 'pandas'], \
+            "Expected 'format' to be in ['numpy','dataframe','df','pandas']"
+    
         # Evaluate each cell of state space model
-        self.ss_eval = self.ss_sym.applymap(self.evaluate_ssm_cell)
-
-        # Convert to numpy
+        try:
+            # Works for standard pandas DataFrame
+            self.ss_eval = self.ss_sym.applymap(self.evaluate_ssm_cell)
+        except AttributeError:
+            # Fallback for cases where applymap is unavailable
+            # (e.g., Series or alternative DataFrame-like object)
+            self.ss_eval = self.ss_sym.apply(lambda col: col.map(self.evaluate_ssm_cell))
+    
+        # Convert to numpy (works for DataFrame)
         self.ss_num = self.ss_eval.to_numpy()
-
+    
         # Return depending on requested format
         if format == 'numpy':
             return self.ss_num
         else:
             return self.ss_eval
-
-
-
+            
 
 #%%
 class StateSpaceSystem:
