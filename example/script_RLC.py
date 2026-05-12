@@ -26,7 +26,7 @@ def input_function(t):
 #%% ======================== TIME DOMAIN COMPARISON ======================== 
 models = ['ccm_RLC','ccm_RLC_PIR']
 # Parameters
-R = 1  # Resistance in ohms
+R = 0.5  # Resistance in ohms
 L = 0.01  # Inductance in henries
 C = 0.001  # Capacitance in farads
 Kp = 1
